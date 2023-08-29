@@ -1,0 +1,11 @@
+# Deployment configuration
+
+repo-name    = "Foundation-enable-ebs-encryption-by-default"
+part-of      = 'foundation'
+
+
+[[CloudFormation]]
+name         = "INFRA-enable-ebs-encryption-by-default"
+template     = 'enable-ebs-encryption-by-default.yml'
+account      = 'ALL'
+regions      = '{all-regions}'

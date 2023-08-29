@@ -1,0 +1,92 @@
+#
+# Peter Bengtson
+#
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: This CloudFormation stack turns on automatic EBS volume encryption for an account.
+
+Resources:
+  EbsEncryptionByDefaultResource:
+    Type: 'Custom::EbsVolumeEncryptionByDefaultResource'
+    Properties:
+      ServiceToken: !GetAtt EbsEncryptionByDefault.Arn
+      Region: !Ref 'AWS::Region'
+
+  EbsEncryptionByDefault:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      MemorySize: 128
+      Timeout: 30
+      Role: !GetAtt EbsEncryptionByDefaultExecutionRole.Arn
+      Code:
+        ZipFile: !Sub |
+          import boto3
+          from botocore.exceptions import ClientError
+          import json
+          import cfnresponse
+
+          ec2 = boto3.client("ec2")
+
+          # Lambda entry point
+          def lambda_handler(event, context):
+            if event['RequestType'] == 'Create' or event['RequestType'] == 'Update':
+              res, reason = enable_encryption()
+            elif event['RequestType'] == 'Delete':
+              res, reason = disable_encryption()
+            else:
+              res = False
+              reason = "Unknown operation: " + event['RequestType']
+            responseData = {}
+            responseData['Reason'] = reason
+            if res:
+              cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData)
+            else:
+              cfnresponse.send(event, context, cfnresponse.FAILED, responseData)
+
+          def enable_encryption():
+            try:
+              response = ec2.enable_ebs_encryption_by_default()
+              return(True, response)
+            except Exception as e:
+              return (False, "Cannot enable EBS encryption: " + str(e))
+
+          def disable_encryption():
+            try:
+              response = ec2.disable_ebs_encryption_by_default()
+              return (True, response)
+            except Exception as e:
+              return (False, "Cannot disable EBS encryption: " + str(e))
+
+  EbsEncryptionByDefaultExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: '/'
+      Policies:
+        - PolicyName: EbsEncryptionPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # lambdas like to log stuff..
+              - Effect: 'Allow'
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: '*'
+              # core permissions for this function
+              - Effect: Allow
+                Action:
+                  - ec2:EnableEbsEncryptionByDefault
+                  - ec2:DisableEbsEncryptionByDefault
+                Resource: '*'
