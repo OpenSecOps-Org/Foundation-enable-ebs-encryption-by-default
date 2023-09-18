@@ -15,7 +15,7 @@ Resources:
   EbsEncryptionByDefault:
     Type: 'AWS::Lambda::Function'
     Properties:
-      Runtime: python3.9
+      Runtime: python3.11
       Handler: index.lambda_handler
       MemorySize: 128
       Timeout: 30
