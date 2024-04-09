@@ -482,12 +482,24 @@ def process_stack(action, resource_type, name, template_body, parameters, capabi
                     return False
                 else:
                     # Wait for the change set to be created
-                    printc(LIGHT_BLUE, "Waiting for changeset to be created...")
-                    waiter = cf_client.get_waiter('change_set_create_complete')
-                    waiter.wait(
-                        StackName=name,
-                        ChangeSetName=change_set_name,
-                    )
+                    try:
+                        printc(LIGHT_BLUE, "Waiting for changeset to be created...")
+                        waiter = cf_client.get_waiter('change_set_create_complete')
+                        waiter.wait(
+                            StackName=name,
+                            ChangeSetName=change_set_name,
+                        )
+                    except WaiterError as we:
+                        # Check if the last_response attribute exists and contains the necessary information
+                        if hasattr(we, 'last_response') and 'Status' in we.last_response and 'StatusReason' in we.last_response:
+                            status = we.last_response['Status']
+                            status_reason = we.last_response['StatusReason']
+                            if status == 'FAILED' and "The submitted information didn't contain changes." in status_reason:
+                                printc(GREEN, f"No changes.")
+                                return False
+                        else:
+                            # If the expected details are not available, re-raise the exception
+                            raise
                     # Display the changes
                     response = cf_client.describe_change_set(
                         StackName=name,
@@ -649,7 +661,8 @@ def update_stack_set(stack_set_name, template_body, parameters, capabilities, re
                          OperationPreferences={
                              'RegionConcurrencyType': 'PARALLEL',
                              'FailureTolerancePercentage': 0,
-                             'MaxConcurrentPercentage': 100
+                             'MaxConcurrentPercentage': 100,
+                             'ConcurrencyMode': 'SOFT_FAILURE_TOLERANCE'
                          })
 
 
@@ -687,7 +700,8 @@ def create_stack_set_instances(stack_set_name, template_body, parameters, capabi
         'OperationPreferences': {
             'RegionConcurrencyType': 'PARALLEL',
             'FailureTolerancePercentage': 0,
-            'MaxConcurrentPercentage': 100
+            'MaxConcurrentPercentage': 100,
+            'ConcurrencyMode': 'SOFT_FAILURE_TOLERANCE'
         }
     }
 
