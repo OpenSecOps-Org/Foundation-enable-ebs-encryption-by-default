@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.0.6
+    * Updated publish.zsh to support dual-remote publishing to CloudSecOps-Org repositories.
+
 ## v1.0.5
     * Refreshed scripts.
 
